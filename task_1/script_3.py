@@ -1,35 +1,59 @@
 import psycopg2
+import os
+from dotenv import load_dotenv
+
+# Завантаження змінних з файлу .env
+load_dotenv()
 
 # Підключення до бази даних PostgreSQL
 connection = psycopg2.connect(
-    database="deine_datenbank", 
-    user="dein_користувач", 
-    password="твой_пароль", 
-    host="localhost", 
-    port="5432"
+    database=os.getenv("DB_NAME"),
+    user=os.getenv("DB_USER"),
+    password=os.getenv("DB_PASSWORD"),
+    host=os.getenv("DB_HOST"),
+    port=os.getenv("DB_PORT")
 )
 
 cursor = connection.cursor()
 
-# Приклад запиту: отримати всі завдання конкретного користувача
-user_id = 1  # Приклад: користувач з ID 1
-cursor.execute("SELECT title, description FROM tasks WHERE user_id = %s;", (user_id,))
-tasks = cursor.fetchall()
+# SQL-запити для виконання:
 
+# 1. Отримати всі завдання певного користувача
+user_id = 1
+cursor.execute("SELECT * FROM tasks WHERE user_id = %s;", (user_id,))
+tasks = cursor.fetchall()
 print(f"Завдання користувача з ID {user_id}:")
 for task in tasks:
-    print(f"- {task[0]}: {task[1]}")
+    print(task)
 
-# Приклад запиту: отримати завдання зі статусом 'in progress'
-cursor.execute("SELECT title, description FROM tasks WHERE status_id = (SELECT id FROM status WHERE name = 'in progress');")
-in_progress_tasks = cursor.fetchall()
-
+# 2. Отримати завдання зі статусом 'in progress'
+cursor.execute("SELECT * FROM tasks WHERE status_id = (SELECT id FROM status WHERE name = 'in progress');")
+tasks_in_progress = cursor.fetchall()
 print("Завдання зі статусом 'in progress':")
-for task in in_progress_tasks:
-    print(f"- {task[0]}: {task[1]}")
+for task in tasks_in_progress:
+    print(task)
 
-# Тут можна додати інші SQL-запити...
+# 3. Оновити статус завдання на 'completed'
+task_id = 1
+cursor.execute("UPDATE tasks SET status_id = (SELECT id FROM status WHERE name = 'completed') WHERE id = %s;", (task_id,))
+print(f"Статус завдання з ID {task_id} оновлено до 'completed'.")
+
+# 4. Отримати користувачів, які не мають завдань
+cursor.execute("SELECT * FROM users WHERE id NOT IN (SELECT user_id FROM tasks);")
+users_without_tasks = cursor.fetchall()
+print("Користувачі без завдань:")
+for user in users_without_tasks:
+    print(user)
+
+# 5. Додати нове завдання для користувача
+cursor.execute("INSERT INTO tasks (title, description, status_id, user_id) VALUES (%s, %s, %s, %s);",
+               ('Нове завдання', 'Опис завдання', 1, user_id))
+print("Нове завдання додано.")
+
+# Збереження змін
+connection.commit()
 
 # Закриття з'єднання
 cursor.close()
 connection.close()
+
